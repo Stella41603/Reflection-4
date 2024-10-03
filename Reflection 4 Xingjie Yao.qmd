@@ -1,0 +1,104 @@
+---
+title: "Ratio Estimator Analysis-Reflection 4"
+author: "Xingjie Yao"
+date: "2024-10-03"
+format: pdf
+editor: visual
+---
+
+## Introduction
+
+This document presents the analysis of the 2022 ACS dataset using Laplace's ratio estimator approach.
+
+```{r}
+# Load necessary libraries
+library(haven)
+library(tidyverse)  # For data manipulation and visualization
+library(labelled)   # For working with labelled data
+
+# Read the data from the .dta.gz file
+acs_data <- read_csv("usa_00002.csv.gz")
+
+# Check the column names in the dataset to verify their names
+colnames(acs_data)
+
+# Select relevant columns and convert them to factors
+acs_data <- 
+  acs_data |>
+  select(STATEICP,EDUC, EDUCD) |>
+  to_factor()
+
+
+```
+
+## Filter for Doctoral Degrees
+
+In this step, I calculated how many respondents in each state have a doctorate based on the value 11 in the EDUCD column and renamed it doctoral_degree_count.
+
+```{r}
+# Filter rows for respondents with a doctoral degree (assuming 116 is the code for Doctoral degree)
+doctoral_degree_counts <- acs_data |>  
+  filter(EDUCD == 116) |>  # Filter where 'EDUCD' equals 116 (Doctoral degree)
+  group_by(STATEICP) |>  # Group by the correct state column 'STATEICP'
+  summarise(doctoral_degree_count = n()) |>  # Count the number of respondents with a doctoral degree per state
+  ungroup()
+
+# Display the resulting data
+doctoral_degree_counts
+
+
+```
+
+## How to obtain the data.
+
+The data for this paper is obtained from the IPUMS USA website. First, click "Get Data" and select "2022 ACS" under "Select Sample". Then click search and enter STATEICP to search again. The data for 2022 will appear. Then we go to "PERSON" and added "EDUC" and "SEX" to our cart. We click "View Cart" and then click "Create Data Extract". We change the "Data Format" to ".csv". We click "Submit Extract". Then, we will receive an email. Finally, We can download and save it locally (usa_00002.csv) and then use it in R.
+
+## A brief overview of the ratio estimators approach.
+
+A ratio estimator is a statistical technique that uses a known relationship between two variables to estimate a population total or mean. In this paper, we use the number of respondents with a doctorate in a given state and the total number of respondents in California to estimate the total number of respondents in each state in the United States.
+
+## **Compare with Actual Respondent Counts**
+
+Perform the comparison between estimated and actual total respondents.
+
+```{r}
+
+# Get the total count of respondents in California
+total_respondents_california <- 391171  # Given value for California
+
+# Get the number of respondents with a doctoral degree in California
+doctoral_respondents_california <- doctoral_degree_counts |>
+  filter(STATEICP == "6") |>  # Assuming "6" is the code for California in STATEICP
+  pull(doctoral_degree_count)
+
+# Calculate the ratio of doctoral degree holders to total respondents in California
+doctoral_ratio_california <- doctoral_respondents_california / total_respondents_california
+
+# Get the total count of respondents in each state using the ratio estimator
+estimated_total_counts <- doctoral_degree_counts |>
+  mutate(estimated_total = doctoral_degree_count / doctoral_ratio_california)
+
+# Get the actual count of respondents in each state
+actual_counts <- acs_data |>
+  group_by(STATEICP) |>
+  summarise(actual_total = n()) |>  # Count actual number of respondents in each state
+  ungroup()
+
+# Merge the estimated totals with actual respondent counts
+comparison <- doctoral_degree_counts |>
+  left_join(actual_counts, by = "STATEICP") |>
+  left_join(estimated_total_counts, by = "STATEICP") |>
+  select(STATEICP, actual_total, estimated_total)
+
+# Display the comparison between actual and estimated counts
+comparison
+
+```
+
+## Some explanation of why you think they are different.
+
+1 The proportion of PhD holders in different states may vary according to state policies and population size, including different education levels, so it may not always be accurate to apply California's ratio to other states.
+
+2 The sample size of each state will be relatively small, which will make the ratio estimator of these states less reliable.
+
+3 Different geographical locations can attract different numbers of PhD respondents. For example, near economic centers or Silicon Valley, there may be more PhD respondents. Such differences will also lead to different
